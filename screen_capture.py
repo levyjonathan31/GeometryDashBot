@@ -24,11 +24,6 @@ def capture_screen():
         # Convert to PIL image
         gray = cv2.cvtColor(pos_state, cv2.COLOR_BGR2GRAY)
         thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
-        cv2.imwrite("pos_state.png", thresh)
-        # use pytesseract to get the text
-        text = pytesseract.image_to_string(thresh, config='--psm 6')
-
-        cv2.imwrite("screenshot.png", state)
-        return state, False, text
-# time.sleep(5)
-# capture_screen()
+        # cv2.imwrite("pos_state.png", thresh)
+        # cv2.imwrite("screenshot.png", state)
+        return state, False, thresh

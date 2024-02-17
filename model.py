@@ -10,7 +10,7 @@ from geometry_dash_env import env
 # from sliding_objects import FrameStacker
 
 from config import screen
-training = True 
+training = False 
 seed = 42
 gamma = 0.99  # Discount factor for past rewards
 epsilon = 1.0  # Epsilon greedy parameter
@@ -84,13 +84,16 @@ if training:
         if keyboard.is_pressed('q'):      
             pressed_q = True
         state = env.reset()
+        if env.done: 
+            continue
         episode_reward = 0
         for timestep in range(1, max_steps_per_episode):
             if keyboard.is_pressed('q'):
                 pressed_q = True
                 break
             frame_count += 1
-
+            if frame_count % 1000 == 0:
+                print("Frame count: ", frame_count)
             # Use epsilon-greedy for exploration
             if frame_count < epsilon_random_frames or epsilon > np.random.rand(1)[0]:
                 # Take random action
@@ -121,7 +124,9 @@ if training:
             state_next_history.append(state_next)
             done_history.append(done)
             rewards_history.append(reward)
-            rewards_history[-10:] = [x * 1.2 for x in rewards_history[-10:]]
+            rewards_history[-15:] = [x * 1.3 for x in rewards_history[-10:]]
+            if (done):
+                rewards_history[-15:] = [x - 2 for x in rewards_history[-10:]]
             state = state_next
 
             # Update every 5th frame and once batch size is over 32
@@ -209,15 +214,24 @@ if training:
         #     break
 if not training:
     env = env()
-    for i in range(10):
-        print("Attempt 1: ", i+1)
+    timestep_total = 0 
+    i = 0
+    while i < 20:
         state = env.reset()
-        for timestep in range(1, max_steps_per_episode):
-            state_tensor = tf.convert_to_tensor(state)
-            state_tensor = tf.expand_dims(state_tensor, 0)
-            action_probs = model(state_tensor, training=False)
-            # Take best action
-            action = tf.argmax(action_probs[0]).numpy()
-            state, _, done, _ = env.step(action)
-            if done:
-                break
+        if env.done: 
+            continue
+        else:
+            print("Attempt 1: ", i+1)
+            for timestep in range(1, max_steps_per_episode):
+                state_tensor = tf.convert_to_tensor(state)
+                state_tensor = tf.expand_dims(state_tensor, 0)
+                action_probs = model(state_tensor, training=False)
+                # Take best action
+                action = tf.argmax(action_probs[0]).numpy()
+                state, _, done, _ = env.step(action)
+                if done:
+                    print("Ended at timestep: ", timestep)
+                    timestep_total += timestep
+                    i += 1
+                    break
+    print("Average timestep: ", timestep_total/20)
