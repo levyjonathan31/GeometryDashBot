@@ -4,15 +4,17 @@ import tensorflow as tf
 import keyboard
 from tensorflow import keras
 from tensorflow.keras import layers
-
+from tensorflow.keras.models import load_model
 from geometry_dash_env import env
+from noisy_layer import NoisyDense
 
 # from sliding_objects import FrameStacker
 
 from config import screen
-training = False 
+train = False
 seed = 42
 gamma = 0.99  # Discount factor for past rewards
+omega = 0.6  # How much prioritization is used
 epsilon = 1.0  # Epsilon greedy parameter
 epsilon_min = 0.02  # Minimum epsilon greedy parameter
 epsilon_max = 1.0  # Maximum epsilon greedy parameter
@@ -36,19 +38,20 @@ def create_q_model():
 
     layer4 = layers.Flatten()(layer3)
 
-    layer5 = layers.Dense(512, activation="relu")(layer4)
-    action = layers.Dense(num_actions, activation="linear")(layer5)
+    layer5 = NoisyDense(512, activation="relu")(layer4)
+    action = NoisyDense(num_actions, activation="linear")(layer5)
     return keras.Model(inputs=inputs, outputs=action)
-
-model = create_q_model()
-
-model_target = create_q_model()
-
+model = None
+model_target = None
 try:
-    model = keras.models.load_model('model.keras')
-    model_target = keras.models.load_model('model_target.keras')
+    model = load_model('model.keras')
+    model_target = load_model('model_target.keras')
+    print("Using pre-trained models")
 except:
-    pass
+    model = create_q_model()
+    model_target = create_q_model()
+    print("Creating new models")
+
 
 optimizer = keras.optimizers.Adam(learning_rate=0.0001, clipnorm=1.0)
 
@@ -63,10 +66,13 @@ running_reward = 0
 episode_count = 0
 frame_count = 0
 
+# Prioritized replay probabilities
+prioritized_replay = []
+
 # Number of frames to take random action and observe output
-epsilon_random_frames = 500.0
+epsilon_random_frames = 5000.0
 # Number of frames for exploration
-epsilon_greedy_frames = 10000.0
+epsilon_greedy_frames = 100000.0
 # Maximum replay length
 max_memory_length = 100000
 # Train the model after 4 actions
@@ -77,7 +83,7 @@ update_target_network = 1000
 loss_function = keras.losses.Huber()
 
 pressed_q = False
-if training:
+if train:
     env = env()
     while not pressed_q:
         # if press q, then save the model
@@ -95,6 +101,8 @@ if training:
             if frame_count % 1000 == 0:
                 print("Frame count: ", frame_count)
             # Use epsilon-greedy for exploration
+            action_probs = model(state_tensor, training=train)
+            action = 0
             if frame_count < epsilon_random_frames or epsilon > np.random.rand(1)[0]:
                 # Take random action
                 action = np.random.choice(num_actions)
@@ -103,38 +111,43 @@ if training:
                 # From environment state
                 state_tensor = tf.convert_to_tensor(state)
                 state_tensor = tf.expand_dims(state_tensor, 0)
-                action_probs = model(state_tensor, training=True)
+
                 # Take best action
                 action = tf.argmax(action_probs[0]).numpy() 
 
+            
             # Decay probability of taking random action
             epsilon -= epsilon_interval / epsilon_greedy_frames
             epsilon = max(epsilon, epsilon_min)
 
             # Apply the sampled action in our environment           
-            state_next, reward, done, _ = env.step(action)
+            state_next, reward, done, _ = env.step(action, episode_reward)
 
             state_next = np.array(state)
 
             episode_reward += reward
-
+            q_value = action_probs[0][action].numpy()
+            
             # Save actions and states in replay buffer
             action_history.append(action)
             state_history.append(state)
             state_next_history.append(state_next)
             done_history.append(done)
             rewards_history.append(reward)
-            rewards_history[-15:] = [x * 1.3 for x in rewards_history[-10:]]
-            if (done):
-                rewards_history[-15:] = [x - 2 for x in rewards_history[-10:]]
+
             state = state_next
 
+            temporal_difference_error = reward + gamma * np.max(model_target.predict(state_next)) - q_value
+
+            prioritized_replay.append(temporal_difference_error**omega)
             # Update every 5th frame and once batch size is over 32
             if frame_count % update_after_actions == 0 and len(done_history) > batch_size:
 
                 # Get indices of samples for replay buffers
-                indices = np.random.choice(range(len(done_history)), size=batch_size)
-                # print([arr.shape for arr in state_next_history])
+
+                # Implement Prioritized Experience Replay
+                sample_probabilities = prioritized_replay / np.sum(prioritized_replay)
+                indices = np.random.choice(range(len(done_history)), size=batch_size, p = sample_probabilities)
                 # Using list comprehension to sample from replay buffer
                 state_sample = np.array([state_history[i] for i in indices])
                 state_next_sample = np.array([state_next_history[i] for i in indices])
@@ -212,7 +225,7 @@ if training:
         # if running_reward > 40:  # Condition to consider the task solved
         #     print("Solved at episode {}!".format(episode_count))
         #     break
-if not training:
+if not train:
     env = env()
     timestep_total = 0 
     i = 0
@@ -225,7 +238,7 @@ if not training:
             for timestep in range(1, max_steps_per_episode):
                 state_tensor = tf.convert_to_tensor(state)
                 state_tensor = tf.expand_dims(state_tensor, 0)
-                action_probs = model(state_tensor, training=False)
+                action_probs = model_target(state_tensor, training=train)
                 # Take best action
                 action = tf.argmax(action_probs[0]).numpy()
                 state, _, done, _ = env.step(action)

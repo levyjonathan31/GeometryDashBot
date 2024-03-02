@@ -8,7 +8,7 @@ class env:
         self.done = False
         self.thresh = None
     
-    def step(self, action):
+    def step(self, action, prev_reward):
         self.state, self.done, thresh = capture_screen()
         if np.array_equal(thresh, self.thresh):
             self.done = True
@@ -16,7 +16,7 @@ class env:
         elif action == 1:
             keyboard.press_and_release('space')
         self.thresh = thresh
-        return self.state, 0.01*(-0.4*action + 1 - int(self.done)), self.done, None
+        return self.state, prev_reward + 0.01*(1 - int(self.done)), self.done, None
     def reset(self):
         self.state, self.done, thresh = capture_screen()
         if np.array_equal(thresh, self.thresh):
