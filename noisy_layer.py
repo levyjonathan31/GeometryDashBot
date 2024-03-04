@@ -1,9 +1,10 @@
 import tensorflow as tf
 from tensorflow.keras import layers
 class NoisyDense(layers.Layer):
-    def __init__(self, units, std_init=0.4, **kwargs):
+    def __init__(self, units, activation = None, std_init=0.5, **kwargs):
         self.units = units
         self.std_init = std_init
+        self.activation = activation
         super(NoisyDense, self).__init__(**kwargs)
 
     def build(self, input_shape):
@@ -29,4 +30,8 @@ class NoisyDense(layers.Layer):
         else:
             w = self.w
             b = self.b
-        return tf.matmul(inputs, w) + b
+        if self.activation:
+            activation_fn = tf.keras.activations.get(self.activation)
+            return activation_fn(tf.matmul(inputs, w) + b)
+        else:
+            return tf.matmul(inputs, w) + b
