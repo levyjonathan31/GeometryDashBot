@@ -31,20 +31,19 @@ class Network(nn.Module):
 
         # set common feature layer
         self.feature_layer = nn.Sequential(
-            nn.Conv2d(in_dim[0], 12, kernel_size=4, stride=2),
-            nn.AvgPool2d(kernel_size=2, stride=2),
+            nn.Conv2d(in_dim[0], 8, kernel_size=4, stride=2),
+            nn.MaxPool2d(kernel_size=2, stride=2),
             nn.ReLU(),
-            nn.Conv2d(12, 24, kernel_size=2, stride=1),
+            nn.MaxPool2d(kernel_size=2, stride=2),
             nn.ReLU(),
         )
         # Determine the output size by doing a forward pass with a mock input
         x = torch.randn(1, in_dim[0], in_dim[1], in_dim[2])
         self._to_linear = None
         self.convs(x) 
-        print(self._to_linear) # this is 600 * 46 = 27600
+        print(self._to_linear)
         self.fc = nn.Linear(self._to_linear, 128) 
         self.advantage_hidden_layer = NoisyLinear(128, 128)
-        # error here ( mat1 and mat2 shapes cannot be multiplied (600x46 and 128x128) )
         self.advantage_layer = NoisyLinear(128, out_dim * atom_size)
 
         # set value layer

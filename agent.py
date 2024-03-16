@@ -49,7 +49,7 @@ class DQNAgent:
         v_max: float = 200.0,
         atom_size: int = 51,
         # N-step Learning
-        n_step: int = 3,
+        n_step: int = 8,
     ):
         """Initialization.
         
@@ -214,6 +214,8 @@ class DQNAgent:
         score = 0
 
         for frame_idx in range(1, num_frames + 1):
+            if (frame_idx % 10 == 0):
+                print("frame_idx: ", frame_idx)
             action = self.select_action(state)
             next_state, reward, done = self.step(action)
 
@@ -243,16 +245,14 @@ class DQNAgent:
                     self._target_hard_update()
 
             # plotting
-            if frame_idx % plotting_interval == 0:
-                self._plot(frame_idx, scores, losses)
-                
-        self.env.close()
+        # if frame_idx % plotting_interval == 0:
+        self._plot(frame_idx, scores, losses)
                 
     def test(self) -> None:
         """Test the agent."""
         self.is_test = True
         naive_env = self.env
-        state = self.env.reset()
+        state = self.env.reset()       
         done = False
         score = 0
         
@@ -264,7 +264,6 @@ class DQNAgent:
             score += reward
         
         print("score: ", score)
-        self.env.close()
         
         # reset
         self.env = naive_env
@@ -327,7 +326,7 @@ class DQNAgent:
         losses: List[float],
     ):
         """Plot the training progresses."""
-        plt.figure(figsize=(20, 5))
+        plt.figure(figsize=(10, 5))
         plt.subplot(131)
         plt.title('frame %s. score: %s' % (frame_idx, np.mean(scores[-10:])))
         plt.plot(scores)
@@ -338,7 +337,7 @@ class DQNAgent:
 
 env = gd_env()
 
-seed = 777
+seed = 7777
 def seed_torch(seed):
     torch.manual_seed(seed)
     if torch.backends.cudnn.enabled:
@@ -350,9 +349,9 @@ np.random.seed(seed)
 random.seed(seed)
 seed_torch(seed)
 
-num_frames = 10000
+num_frames = 75000
 memory_size = 10000
-batch_size = 128
+batch_size = 48
 target_update = 100
 
 # check if model exists
@@ -361,17 +360,17 @@ target_update = 100
 agent = DQNAgent(env, memory_size, batch_size, target_update, seed)
 # try to load models
 try :
-    agent.dqn.load("dqn_model.pth")
-    agent.dqn_target.load("dqn_target_model.pth")
+    agent.dqn.load_state_dict(torch.load("dqn_model.pth"))
+    agent.dqn_target.load_state_dict(torch.load("dqn_model_target.pth"))
 except:
     print("No models to load, training from scratch.")
 
-agent.train(num_frames)
+# agent.train(num_frames)
 
 
-# save the model
-agent.dqn.save("dqn_model.pth")
-agent.dqn_target.save("dqn_target_model.pth")
+# save the model         
+torch.save(agent.dqn.state_dict(), "dqn_model.pth")
+torch.save(agent.dqn_target.state_dict(), "dqn_model_target.pth")
 
 # test
 agent.test()
