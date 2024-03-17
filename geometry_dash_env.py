@@ -13,12 +13,12 @@ class gd_env:
     def step(self, action):
         self.state, thresh = capture_screen()
         if np.array_equal(thresh, self.thresh):
-            return self.state, -0.25, True
+            return self.state, -1, True
         else:
             if action == 1:
                 keyboard.press_and_release('space')
             self.thresh = thresh
-            return self.state, 0.01, False
+            return self.state, 1, False
 
     def reset(self):
         self.state, thresh = capture_screen()

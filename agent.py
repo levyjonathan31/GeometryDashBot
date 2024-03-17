@@ -38,7 +38,7 @@ class DQNAgent:
         memory_size: int,
         batch_size: int,
         target_update: int,
-        seed: int,
+        lr: int,
         gamma: float = 0.99,
         # PER parameters
         alpha: float = 0.2,
@@ -74,7 +74,7 @@ class DQNAgent:
         self.env = env
         self.batch_size = batch_size
         self.target_update = target_update
-        self.seed = seed
+        self.lr = lr
         self.gamma = gamma
         # NoisyNet: All attributes related to epsilon are removed
         
@@ -119,7 +119,7 @@ class DQNAgent:
         self.dqn_target.eval()
         
         # optimizer
-        self.optimizer = optim.Adam(self.dqn.parameters())
+        self.optimizer = optim.Adam(self.dqn.parameters(), lr=lr)
 
         # transition to store in memory
         self.transition = list()
@@ -245,8 +245,12 @@ class DQNAgent:
                     self._target_hard_update()
 
             # plotting
-        # if frame_idx % plotting_interval == 0:
-        self._plot(frame_idx, scores, losses)
+        # if frame_idx % plotting_interval == 0:        
+        # save the model         
+        print("Saving model")
+        torch.save(agent.dqn.state_dict(), "dqn_model.pth")
+        torch.save(agent.dqn_target.state_dict(), "dqn_model_target.pth")
+        # self._plot(frame_idx, scores, losses)
                 
     def test(self) -> None:
         """Test the agent."""
@@ -338,6 +342,7 @@ class DQNAgent:
 env = gd_env()
 
 seed = 7777
+lr = 0.0001
 def seed_torch(seed):
     torch.manual_seed(seed)
     if torch.backends.cudnn.enabled:
@@ -349,7 +354,7 @@ np.random.seed(seed)
 random.seed(seed)
 seed_torch(seed)
 
-num_frames = 75000
+num_frames = 2500
 memory_size = 10000
 batch_size = 48
 target_update = 100
@@ -357,7 +362,7 @@ target_update = 100
 # check if model exists
 
 # train
-agent = DQNAgent(env, memory_size, batch_size, target_update, seed)
+agent = DQNAgent(env, memory_size, batch_size, target_update, lr)
 # try to load models
 try :
     agent.dqn.load_state_dict(torch.load("dqn_model.pth"))
@@ -365,12 +370,7 @@ try :
 except:
     print("No models to load, training from scratch.")
 
-# agent.train(num_frames)
+while True:
+    agent.train(num_frames)
 
 
-# save the model         
-torch.save(agent.dqn.state_dict(), "dqn_model.pth")
-torch.save(agent.dqn_target.state_dict(), "dqn_model_target.pth")
-
-# test
-agent.test()
