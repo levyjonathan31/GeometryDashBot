@@ -9,6 +9,32 @@ from geometry_dash_env import gd_env
 from torch.nn.utils import clip_grad_norm_
 import matplotlib.pyplot as plt
 import random
+import time
+import keyboard
+
+def visualize_weights(model, layer):
+    """Visualize weights of the model's convolutional layers."""
+    # Ensure model is in eval mode
+    model.eval()
+
+    # Get the weights of the chosen layer
+    weights = model.feature_layer[layer*3].weight.data
+
+    # Convert the weights tensor to numpy array
+    weights = weights.detach().cpu().numpy()
+
+    # Get the number of filters
+    num_filters = weights.shape[0]
+
+    # Create subplots to visualize each filter
+    fig, axs = plt.subplots(1, num_filters, figsize=(10, 10))
+
+    for i in range(num_filters):
+        axs[i].imshow(weights[i][0], cmap='gray')
+        axs[i].axis('off')
+
+    plt.show()
+
 class DQNAgent:
     """DQN Agent interacting with environment.
     
@@ -212,10 +238,14 @@ class DQNAgent:
         losses = []
         scores = []
         score = 0
-
+        start_time = time.time()
         for frame_idx in range(1, num_frames + 1):
-            if (frame_idx % 10 == 0):
-                print("frame_idx: ", frame_idx)
+            if keyboard.is_pressed('q'):
+                print("Quitting")
+                break
+            if (frame_idx % 100 == 0):
+                print("avg frame rate", (time.time() - start_time) / 100)
+                start_time = time.time()
             action = self.select_action(state)
             next_state, reward, done = self.step(action)
 
@@ -243,13 +273,13 @@ class DQNAgent:
                 # if hard update is needed
                 if update_cnt % self.target_update == 0:
                     self._target_hard_update()
-
+ 
             # plotting
         # if frame_idx % plotting_interval == 0:        
         # save the model         
-        print("Saving model")
         torch.save(agent.dqn.state_dict(), "dqn_model.pth")
         torch.save(agent.dqn_target.state_dict(), "dqn_model_target.pth")
+        print("Saved model")
         # self._plot(frame_idx, scores, losses)
                 
     def test(self) -> None:
@@ -323,12 +353,16 @@ class DQNAgent:
         """Hard update: target <- local."""
         self.dqn_target.load_state_dict(self.dqn.state_dict())
                 
+
+            
     def _plot(
         self, 
         frame_idx: int, 
         scores: List[float], 
         losses: List[float],
     ):
+        def moving_average(x, w):
+            return np.convolve(x, np.ones(w), 'valid') / w
         """Plot the training progresses."""
         plt.figure(figsize=(10, 5))
         plt.subplot(131)
@@ -336,13 +370,15 @@ class DQNAgent:
         plt.plot(scores)
         plt.subplot(132)
         plt.title('loss')
-        plt.plot(losses)
+        plt.ylim([0, 0.5])
+        avg_losses = moving_average(losses, 100)
+        plt.plot(avg_losses)
         plt.show()
 
 env = gd_env()
 
 seed = 7777
-lr = 0.0001
+
 def seed_torch(seed):
     torch.manual_seed(seed)
     if torch.backends.cudnn.enabled:
@@ -354,15 +390,17 @@ np.random.seed(seed)
 random.seed(seed)
 seed_torch(seed)
 
-num_frames = 2500
+lr = 0.0001
+num_frames = 1000
 memory_size = 10000
-batch_size = 48
+batch_size = 16
 target_update = 100
 
 # check if model exists
 
 # train
 agent = DQNAgent(env, memory_size, batch_size, target_update, lr)
+
 # try to load models
 try :
     agent.dqn.load_state_dict(torch.load("dqn_model.pth"))
@@ -370,7 +408,6 @@ try :
 except:
     print("No models to load, training from scratch.")
 
-while True:
+# visualize_weights(agent.dqn, 1)
+while(True):
     agent.train(num_frames)
-
-

@@ -5,7 +5,7 @@ from gym import spaces
 class gd_env:
     def __init__(self):
         self.action_space = spaces.Discrete(2)  # Discrete action space with 2 actions
-        self.observation_space = spaces.Box(low=0, high=255, shape=(3, 64, 88), dtype=np.uint8)
+        self.observation_space = spaces.Box(low=0, high=255, shape=(3, 128, 152), dtype=np.uint8)
         self.state = None
         self.done = False
         self.thresh = None

@@ -31,7 +31,10 @@ class Network(nn.Module):
 
         # set common feature layer
         self.feature_layer = nn.Sequential(
-            nn.Conv2d(in_dim[0], 8, kernel_size=4, stride=2),
+            nn.Conv2d(in_dim[0], 12, kernel_size=6, stride=3),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.Conv2d(12, 24, kernel_size=4, stride=2),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=2, stride=2),
         )
@@ -81,3 +84,5 @@ class Network(nn.Module):
         self.advantage_layer.reset_noise()
         self.value_hidden_layer.reset_noise()
         self.value_layer.reset_noise()
+
+    
