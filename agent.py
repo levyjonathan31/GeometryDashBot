@@ -75,7 +75,7 @@ class DQNAgent:
         v_max: float = 200.0,
         atom_size: int = 51,
         # N-step Learning
-        n_step: int = 8,
+        n_step: int = 14,
     ):
         """Initialization.
         
@@ -106,10 +106,9 @@ class DQNAgent:
         
         # device: cpu / gpu
         self.device = torch.device(
-            "cuda" if torch.cuda.is_available() else "cpu"
+            "cuda" if torch.cuda.is_available() else "cpu"     
         )
-        print(self.device)
-        
+        print(torch.cuda.get_device_name(0))
         # PER
         # memory for 1-step Learning
         self.beta = beta
@@ -143,10 +142,18 @@ class DQNAgent:
         ).to(self.device)
         self.dqn_target.load_state_dict(self.dqn.state_dict())
         self.dqn_target.eval()
-        
-        # optimizer
         self.optimizer = optim.Adam(self.dqn.parameters(), lr=lr)
+        # optimizer
 
+        try:
+            checkpoint = torch.load("dqn_model.pth")
+            self.dqn.load_state_dict(checkpoint['model_state_dict'])
+            self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+            checkpoint_t = torch.load("dqn_model_target.pth")
+            self.dqn_target.load_state_dict(checkpoint_t['model_target_state_dict'])
+            print("Loaded models")
+        except:
+            print("No models to load, training from scratch.")  
         # transition to store in memory
         self.transition = list()
         
@@ -166,9 +173,9 @@ class DQNAgent:
         
         return selected_action
 
-    def step(self, action: np.ndarray) -> Tuple[np.ndarray, np.float64, bool]:
+    def step(self, action: np.ndarray, progress) -> Tuple[np.ndarray, np.float64, bool]:
         """Take an action and return the response of the env."""
-        next_state, reward, done = self.env.step(action)
+        next_state, reward, done = self.env.step(action, progress)
         
         if not self.is_test:
             self.transition += [reward, next_state, done]
@@ -232,22 +239,24 @@ class DQNAgent:
     def train(self, num_frames: int, plotting_interval: int = 200):
         """Train the agent."""
         self.is_test = False
-        
+        curr_max_score = 0
         state = self.env.reset()
         update_cnt = 0
         losses = []
         scores = []
         score = 0
         start_time = time.time()
+        episode_frame = 0
         for frame_idx in range(1, num_frames + 1):
+            episode_frame += 1            
             if keyboard.is_pressed('q'):
                 print("Quitting")
                 break
-            if (frame_idx % 100 == 0):
-                print("avg frame rate", (time.time() - start_time) / 100)
+            if (frame_idx % 1000 == 0):
+                print("avg frame rate", (time.time() - start_time) / 1000)
                 start_time = time.time()
             action = self.select_action(state)
-            next_state, reward, done = self.step(action)
+            next_state, reward, done = self.step(action, episode_frame)
 
             state = next_state
             score += reward
@@ -262,7 +271,9 @@ class DQNAgent:
             if done:
                 state = self.env.reset()
                 scores.append(score)
+                curr_max_score = max(curr_max_score, score)
                 score = 0
+                episode_frame = 0
 
             # if training is ready
             if len(self.memory) >= self.batch_size:
@@ -277,9 +288,16 @@ class DQNAgent:
             # plotting
         # if frame_idx % plotting_interval == 0:        
         # save the model         
-        torch.save(agent.dqn.state_dict(), "dqn_model.pth")
-        torch.save(agent.dqn_target.state_dict(), "dqn_model_target.pth")
+        torch.save({
+            'model_state_dict': self.dqn.state_dict(),
+            'optimizer_state_dict': self.optimizer.state_dict(),
+        }, "dqn_model.pth")
+        
+        torch.save({'model_target_state_dict': self.dqn_target.state_dict(),
+                   'optimizer_state_dict': self.optimizer.state_dict(), 
+                   },"dqn_model_target.pth")
         print("Saved model")
+        print("Max score last 2000 frames: ", curr_max_score)
         # self._plot(frame_idx, scores, losses)
                 
     def test(self) -> None:
@@ -292,7 +310,7 @@ class DQNAgent:
         
         while not done:
             action = self.select_action(state)
-            next_state, reward, done = self.step(action)
+            next_state, reward, done = self.step(action, 0)
 
             state = next_state
             score += reward
@@ -391,10 +409,10 @@ random.seed(seed)
 seed_torch(seed)
 
 lr = 0.0001
-num_frames = 1000
+num_frames = 2000
 memory_size = 10000
 batch_size = 16
-target_update = 100
+target_update = 200
 
 # check if model exists
 
@@ -402,12 +420,11 @@ target_update = 100
 agent = DQNAgent(env, memory_size, batch_size, target_update, lr)
 
 # try to load models
-try :
-    agent.dqn.load_state_dict(torch.load("dqn_model.pth"))
-    agent.dqn_target.load_state_dict(torch.load("dqn_model_target.pth"))
-except:
-    print("No models to load, training from scratch.")
 
-# visualize_weights(agent.dqn, 1)
+
+#  visualize_weights(agent.dqn, 0)
 while(True):
-    agent.train(num_frames)
+    if keyboard.is_pressed('q'):
+        print("Quitting")
+        break
+    agent.train(num_frames)           

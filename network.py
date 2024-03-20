@@ -31,12 +31,14 @@ class Network(nn.Module):
 
         # set common feature layer
         self.feature_layer = nn.Sequential(
-            nn.Conv2d(in_dim[0], 12, kernel_size=6, stride=3),
+            nn.Conv2d(in_dim[0], 16, kernel_size=5, stride=2),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=2, stride=2),
-            nn.Conv2d(12, 24, kernel_size=4, stride=2),
+            nn.Conv2d(16, 32, kernel_size=4, stride=2),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.Conv2d(32, 32, kernel_size=3, stride=1),
+            nn.ReLU(),
         )
         # Determine the output size by doing a forward pass with a mock input
         x = torch.randn(1, in_dim[0], in_dim[1], in_dim[2])

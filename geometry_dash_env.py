@@ -10,9 +10,10 @@ class gd_env:
         self.done = False
         self.thresh = None
     
-    def step(self, action):
+    def step(self, action, progress):
         self.state, thresh = capture_screen()
-        if np.array_equal(thresh, self.thresh):
+        if np.array_equal(thresh, self.thresh) and self.done == False:
+            print("Death frame: ", progress)
             return self.state, -1, True
         else:
             if action == 1:
